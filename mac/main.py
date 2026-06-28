@@ -6,6 +6,26 @@ HTML 渲染界面，原生窗口显示（不跳转浏览器）
 import sys, os, json, threading, datetime, re, traceback, subprocess
 from pathlib import Path
 
+# ─── 自动引导 pip（处理 embed Python 无 pip 的情况） ───
+def _ensure_pip():
+    """确保 pip 可用：删除 ._pth 限制 + bootstrap pip"""
+    app_dir = Path(__file__).parent
+    for pth in app_dir.glob("**/python*._pth"):
+        try:
+            pth.unlink()
+        except:
+            pass
+    try:
+        __import__("pip")
+    except ImportError:
+        try:
+            import ensurepip
+            ensurepip._bootstrap()
+        except:
+            pass
+
+_ensure_pip()
+
 # ─── 启动时自动安装缺失依赖 ───
 _MISSING = []
 for _mod in ("webview",):
@@ -14,11 +34,16 @@ for _mod in ("webview",):
     except ImportError:
         _MISSING.append(_mod)
 if _MISSING:
-    print(f"[安装] 缺失依赖: {_MISSING}")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", *_MISSING,
-         "-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "-q"]
-    )
+    print(f"[安装] 缺失依赖: {_MISSING} ...")
+    for dep in _MISSING:
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", dep,
+                 "-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "-q"]
+            )
+        except Exception as e:
+            print(f"[警告] 安装 {dep} 失败: {e}")
+            print(f"[提示] 请手动执行: {sys.executable} -m pip install {dep}")
 
 # ─── 全局异常捕获 ───
 def _global_excepthook(exc_type, exc_value, exc_traceback):
