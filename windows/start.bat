@@ -1,23 +1,37 @@
 @echo off
 chcp 65001 >nul
 title 考试答题工具
-echo.
-echo === 考试答题工具 - Windows 启动 ===
-echo.
 cd /d "%~dp0"
-REM 检查 Python
-python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Python
-    echo 请安装 Python 3.9+，并确保 python 命令可用
-    pause
-    exit /b 1
+
+echo.
+echo === 考试答题工具 - Windows启动 ===
+echo.
+
+:: 检查便携版Python
+if not exist "python\python.exe" (
+    echo [下载] 便携版 Python 3.12...
+    curl -L -o python.zip "https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip" 2>nul
+    if not exist python.zip (
+        echo [错误] 下载失败，请检查网络连接
+        pause
+        exit /b 1
+    )
+    mkdir python 2>nul
+    tar -xf python.zip -C python\
+    del python.zip
+    :: 启用 pip
+    python\python -m pip install --upgrade pip 2>nul
 )
-REM 检查依赖
-python -c "import webview" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [安装依赖] pywebview...
-    pip install pywebview
+
+:: 安装依赖
+if not exist "python\Lib\site-packages\webview" (
+    echo [安装] pywebview...
+    python\python -m pip install pywebview -q
+    echo [安装] pyinstaller...
+    python\python -m pip install pyinstaller -q
 )
-python main.py
+
+echo [启动] 运行答题工具...
+python\python main.py
+
 pause
