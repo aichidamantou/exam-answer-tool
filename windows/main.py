@@ -83,13 +83,25 @@ class ApiHandler(BaseHTTPRequestHandler):
             try:
                 result = check_pid(pid, ck, getanserurl,
                                     browser_headers=browser_headers if browser_headers else None)
-                # PID 检测通过后更新全局 pid 并保存 config
+                # PID 检测通过后更新全局参数并保存 config
                 if result.get("ok", False):
                     pid_val = pid
+                    # 顺便提取 template_pageid/course_id
+                    try:
+                        h = fetch_page(pid, ck, getanserurl,
+                                       browser_headers=browser_headers if browser_headers else None)
+                        params = parse_exam_params(h)
+                        if params.get("template_pageid"):
+                            template_pageid = params["template_pageid"]
+                            course_id = params["course_id"]
+                    except: pass
                     try:
                         with open(CONFIG_FILE, encoding="utf-8") as f:
                             d = json.load(f)
                         d["pid"] = pid
+                        if template_pageid:
+                            d["template_pageid"] = template_pageid
+                            d["course_id"] = course_id
                         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                             json.dump(d, f, ensure_ascii=False, indent=2)
                     except: pass
@@ -111,9 +123,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 template_pageid_saved = data.get("template_pageid", "")
                 course_id_saved = data.get("course_id", "")
                 if template_pageid_saved and course_id_saved:
-                    global template_pageid, course_id, stored_answers
                     template_pageid = template_pageid_saved
                     course_id = course_id_saved
+                    global stored_answers
                     stored_answers = data["questions"]
                 cookie_str = ck; pid_val = request_pid; save_config()
                 self._json({
