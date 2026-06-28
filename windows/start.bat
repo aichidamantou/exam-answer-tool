@@ -12,59 +12,67 @@ set PYDIR=python
 set PYEXE=%PYDIR%\python.exe
 
 if not exist "%PYEXE%" (
-    echo [下载] 便携版 Python 3.12 ...
+    echo [1/4] 下载便携版 Python 3.12 ...
     if not exist "%PYDIR%" mkdir "%PYDIR%"
 
-    set DL_OK=0
-
-    :: 1. 华为云镜像
+    :: 华为云镜像
     curl -L -o python.zip "https://repo.huaweicloud.com/python/3.12.4/python-3.12.4-embed-amd64.zip" 2>nul
-    if exist python.zip set DL_OK=1
-
-    :: 2. 清华源（备用）
     if not exist python.zip (
+        :: 清华源（备用）
         curl -L -o python.zip "https://mirrors.tuna.tsinghua.edu.cn/python/3.12.4/python-3.12.4-embed-amd64.zip" 2>nul
-        if exist python.zip set DL_OK=1
     )
-
-    :: 3. 官方源（最后备用）
     if not exist python.zip (
+        :: 官方源
         curl -L -o python.zip "https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip" 2>nul
-        if exist python.zip set DL_OK=1
     )
 
     if not exist python.zip (
-        echo.
-        echo [错误] Python下载失败
-        echo 请手动下载: https://mirrors.tuna.tsinghua.edu.cn/python/3.12.4/
-        echo 选择 python-3.12.4-embed-amd64.zip
-        echo 解压到 windows\python 目录后重新运行
+        echo [错误] Python下载失败，请检查网络连接
         pause
         exit /b 1
     )
 
-    echo [解压] Python...
+    echo [2/4] 解压...
     tar -xf python.zip -C "%PYDIR%"
     del python.zip
 
-    :: 启用pip
-    "%PYEXE%" -m pip install --upgrade pip -q 2>nul
+    :: 删除 ._pth 文件解除路径限制（否则 pip 无法工作）
+    if exist "%PYDIR%\python*._pth" del "%PYDIR%\python*._pth"
+    if exist "%PYDIR%\python312._pth" del "%PYDIR%\python312._pth"
 
-    :: 设置pip国内源
-    if exist "%PYDIR%\" (
-        echo [global] > "%PYDIR%\pip.ini"
-        echo index-url = https://pypi.tuna.tsinghua.edu.cn/simple >> "%PYDIR%\pip.ini"
-        echo trusted-host = pypi.tuna.tsinghua.edu.cn >> "%PYDIR%\pip.ini"
+    :: 写入 pip 配置
+    echo [global] > "%PYDIR%\pip.ini"
+    echo index-url = https://pypi.tuna.tsinghua.edu.cn/simple >> "%PYDIR%\pip.ini"
+    echo trusted-host = pypi.tuna.tsinghua.edu.cn >> "%PYDIR%\pip.ini"
+)
+
+:: 安装 pip（embed版默认没有pip）
+echo [3/4] 安装 pip + 依赖...
+if not exist "%PYDIR%\Scripts\pip.exe" (
+    "%PYEXE%" -m pip --version >nul 2>&1
+    if errorlevel 1 (
+        curl -L -o get-pip.py "https://bootstrap.pypa.io/get-pip.py" 2>nul
+        if exist get-pip.py (
+            "%PYEXE%" get-pip.py -q 2>nul
+            del get-pip.py
+        )
     )
 )
 
-:: 安装依赖
-if not exist "%PYDIR%\Lib\site-packages\pywebview\" (
-    echo [安装] pywebview (使用清华镜像)...
-    "%PYEXE%" -m pip install pywebview -q -i https://pypi.tuna.tsinghua.edu.cn/simple
-)
+:: 安装 pywebview
+"%PYEXE%" -m pip install pywebview -q -i https://pypi.tuna.tsinghua.edu.cn/simple 2>nul
 
-echo [启动] 运行答题工具...
-"%PYEXE%" main.py
+:: 捕获错误日志
+echo [4/4] 启动程序...
+"%PYEXE%" main.py > exam_tool.log 2>&1
+if errorlevel 1 (
+    echo.
+    echo [错误] 程序异常退出，请查看 exam_tool.log
+    type exam_tool.log
+    echo.
+    echo 按任意键关闭...
+    pause >nul
+    exit /b 1
+)
 
 pause
