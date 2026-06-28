@@ -7,43 +7,60 @@ import sys, os, json, threading, datetime, re, traceback, subprocess
 from pathlib import Path
 
 # ─── 自动引导 pip（处理 embed Python 无 pip 的情况） ───
-def _ensure_pip():
-    """确保 pip 可用：删除 ._pth 限制 + bootstrap pip"""
+def _ensure_pip(force=False):
+    """确保 pip 可用：删除 ._pth + 安装 pip"""
     app_dir = Path(__file__).parent
     for pth in app_dir.glob("**/python*._pth"):
         try:
             pth.unlink()
         except:
             pass
-    try:
-        __import__("pip")
-    except ImportError:
+    if not force:
         try:
-            import ensurepip
-            ensurepip._bootstrap()
-        except:
+            __import__("pip")
+            return True
+        except ImportError:
             pass
-
-_ensure_pip()
+    # 下载 get-pip.py 并执行
+    import urllib.request
+    try:
+        print("[pip] 下载 get-pip.py ...")
+        urllib.request.urlretrieve("https://bootstrap.pypa.io/get-pip.py",
+                                   app_dir / "get-pip.py")
+        subprocess.check_call([sys.executable, str(app_dir / "get-pip.py"), "-q"])
+        (app_dir / "get-pip.py").unlink(missing_ok=True)
+        return True
+    except Exception as e:
+        print(f"[pip] 安装 pip 失败: {e}")
+        return False
 
 # ─── 启动时自动安装缺失依赖 ───
-_MISSING = []
-for _mod in ("webview",):
-    try:
-        __import__(_mod)
-    except ImportError:
-        _MISSING.append(_mod)
-if _MISSING:
-    print(f"[安装] 缺失依赖: {_MISSING} ...")
+def _install_deps():
+    _MISSING = []
+    for _mod in ("webview",):
+        try:
+            __import__(_mod)
+        except ImportError:
+            _MISSING.append(_mod)
+    if not _MISSING:
+        return True
+    print(f"[安装] 缺失依赖: {_MISSING}")
+    _ensure_pip()
+    ok = True
     for dep in _MISSING:
         try:
             subprocess.check_call(
                 [sys.executable, "-m", "pip", "install", dep,
                  "-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "-q"]
             )
+            __import__(_mod)
+            print(f"  ✅ {dep}")
         except Exception as e:
-            print(f"[警告] 安装 {dep} 失败: {e}")
-            print(f"[提示] 请手动执行: {sys.executable} -m pip install {dep}")
+            print(f"  ❌ {dep} 安装失败: {e}")
+            ok = False
+    return ok
+
+_install_deps()
 
 # ─── 全局异常捕获 ───
 def _global_excepthook(exc_type, exc_value, exc_traceback):
@@ -505,15 +522,24 @@ def main():
 
     port = start_api()
 
-    import webview
-    webview.create_window(
-        "考试答题工具",
-        url=f"http://127.0.0.1:{port}",
-        width=1050,
-        height=730,
-        resizable=False,
-    )
-    webview.start(private_mode=False)
+    try:
+        import webview
+        webview.create_window(
+            "考试答题工具",
+            url=f"http://127.0.0.1:{port}",
+            width=1050,
+            height=730,
+            resizable=False,
+        )
+        webview.start(private_mode=False)
+    except Exception as e:
+        print(f"[回退] pywebview 不可用 ({e})，已在浏览器打开")
+        import webbrowser
+        webbrowser.open(f"http://127.0.0.1:{port}")
+        # 保持 HTTP 服务器运行
+        while True:
+            import time
+            time.sleep(3600)
 
 if __name__ == "__main__":
     main()
