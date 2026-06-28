@@ -538,12 +538,28 @@ def main():
     ApiHandler.do_GET = new_do_GET
 
     port = start_api()
+    url = f"http://127.0.0.1:{port}"
+
+    # --server 模式：跳过 pywebview，直接开浏览器
+    if "--server" in sys.argv:
+        print(f"\n=== 服务运行模式 ===")
+        print(f"地址: {url}")
+        print(f"状态: 按 Ctrl+C 停止服务")
+        print()
+        import webbrowser
+        webbrowser.open(url)
+        try:
+            while True:
+                import time; time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n服务已停止")
+        return
 
     try:
         import webview
         webview.create_window(
             "考试答题工具",
-            url=f"http://127.0.0.1:{port}",
+            url=url,
             width=1050,
             height=730,
             resizable=False,
@@ -552,11 +568,10 @@ def main():
     except Exception as e:
         print(f"[回退] pywebview 不可用 ({e})，已在浏览器打开")
         import webbrowser
-        webbrowser.open(f"http://127.0.0.1:{port}")
-        import time
+        webbrowser.open(url)
         try:
             while True:
-                time.sleep(1)
+                import time; time.sleep(1)
         except KeyboardInterrupt:
             pass
 
