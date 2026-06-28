@@ -72,6 +72,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._json({"error": str(e)[:60]})
         elif u.path == '/api/config':
             self._json({"cookie": cookie_str, "pid": pid_val, "getanserurl": getanserurl})
+        elif u.path == '/api/save':
+            q = parse_qs(u.query)
+            cookie_str = q.get('cookie', [''])[0]
+            pid_val = q.get('pid', [''])[0]
+            save_config()
+            self._text("saved")
         else:
             self._text("ok")
     def _text(self, t):
@@ -154,6 +160,7 @@ function log(m){let t=new Date().toLocaleTimeString();let l="["+t+"] "+m;logs.pu
 function checkPid(){let p=document.getElementById('pid').value.trim();let c=document.getElementById('cookie').value.trim();if(!p||!/^\d+$/.test(p)){alert('输入 PID 数字');return}log('PID 检测: '+p);fetch(API+'/api/check?pid='+p+'&cookie='+encodeURIComponent(c)).then(r=>r.text()).then(t=>log(t)).catch(e=>log('错误: '+e))}
 function fetchAnswers(){let p=document.getElementById('pid').value.trim();let c=document.getElementById('cookie').value.trim();if(!p||!/^\d+$/.test(p)){alert('输入 PID');return}log('提取答案: '+p);fetch(API+'/api/fetch?pid='+p+'&cookie='+encodeURIComponent(c)).then(r=>r.json()).then(d=>{if(d.error){log('错误: '+d.error);return};log('完成: '+d.found+'/'+d.total);document.getElementById('preview').value=d.text;document.getElementById('execBtn').disabled=false;document.getElementById('vbtn').disabled=false}).catch(e=>log('错误: '+e))}
 window.onload=function(){let p=document.getElementById('pid');let ck=document.getElementById('cookie');fetch(API+'/api/config').then(r=>r.json()).then(d=>{if(d.cookie)ck.value=d.cookie;if(d.pid)p.value=d.pid});log('程序启动')};
+setInterval(function(){let p=document.getElementById('pid').value.trim();let c=document.getElementById('cookie').value.trim();if(p||c){fetch(API+'/api/save?pid='+encodeURIComponent(p)+'&cookie='+encodeURIComponent(c))}},3000);
 </script></body></html>"""
 
 def main():
