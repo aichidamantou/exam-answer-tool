@@ -3,32 +3,42 @@
 考试答题工具 - 原生窗口版
 HTML 渲染界面，原生窗口显示（不跳转浏览器）
 """
-import sys, os, json, threading, datetime, re, traceback
+import sys, os, json, threading, datetime, re, traceback, subprocess
 from pathlib import Path
 
-# 捕获所有未处理异常，写入日志
+# ─── 启动时自动安装缺失依赖 ───
+_MISSING = []
+for _mod in ("webview",):
+    try:
+        __import__(_mod)
+    except ImportError:
+        _MISSING.append(_mod)
+if _MISSING:
+    print(f"[安装] 缺失依赖: {_MISSING}")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", *_MISSING,
+         "-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "-q"]
+    )
+
+# ─── 全局异常捕获 ───
 def _global_excepthook(exc_type, exc_value, exc_traceback):
-    log_path = Path(__file__).parent / "exam_tool.log"
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(f"[{datetime.datetime.now()}] UNHANDLED ERROR:\n")
-        traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
-        f.write("\n")
-    # Windows 闪退时保持窗口
+    try:
+        log_path = Path(__file__).parent / "exam_tool.log"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.datetime.now()}] UNHANDLED ERROR:\n")
+            traceback.print_exception(exc_type, exc_value, exc_traceback, file=f)
+            f.write("\n")
+    except:
+        traceback.print_exception(exc_type, exc_value, exc_traceback)
     try:
         import ctypes
         ctypes.windll.user32.MessageBoxW(0, str(exc_value), "程序错误", 0x10)
     except:
         pass
-    sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 sys.excepthook = _global_excepthook
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-# embed python 兼容：添加 site-packages 到路径
-try:
-    import site
-except:
-    pass
 from modules.fetcher import fetch_page, parse_html, check_cookie, parse_exam_params, fetch_and_parse, parse_headers_from_paste
 from modules.submitter import submit_exam, parse_exam_result, random_exam, random_gradual_exam, get_job_status, start_gradual_submit
 from modules.checker import check_pid
