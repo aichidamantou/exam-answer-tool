@@ -8,4 +8,10 @@ build/
 __pycache__/
 mac/考试答题工具
 mac/考试答题工具.app
+mac/config.json
+mac/cookie.txt
+mac/headers.txt
+windows/config.json
+windows/cookie.txt
+windows/headers.txt
 windows/考试答题工具.exe

@@ -30,27 +30,47 @@ HEADER_TEMPLATE = {
 def parse_headers_from_paste(raw_text: str) -> dict:
     """
     解析从浏览器 F12 复制的请求标头文本
-    支持两种格式:
-      1. Chrome DevTools "Copy as cURL" 或 "Copy request headers"
-      2. key: value 格式
+    支持三种格式:
+      1. key: value (Chrome/Firefox DevTools)
+      2. key\\nvalue (Edge DevTools, key/value 分行)
+      3. 纯 cookie 文本
 
     返回: {header_key: header_value, ...}
     """
     headers = {}
     cookie = ""
+    lines = raw_text.split("\n")
+    i = 0
 
-    for line in raw_text.split("\n"):
-        line = line.strip()
-        if not line or line.startswith(":") or line.startswith("//"):
+    while i < len(lines):
+        line = lines[i].strip()
+        i += 1
+        if not line or line.startswith(":"):
             continue
 
-        # key: value 格式
+        # 跳过中文行（Edge 复制的"请求URL""请求方法""状态代码"等）
+        if re.search(r'[一-鿿]', line) and ":" not in line:
+            continue
+
+        # 格式1: key: value
         m = re.match(r'^([a-zA-Z][a-zA-Z0-9_-]*)\s*:\s*(.*)', line)
-        if not m:
-            continue
-
-        key = m.group(1).strip()
-        value = m.group(2).strip()
+        if m:
+            key = m.group(1).strip()
+            value = m.group(2).strip()
+        else:
+            # 格式2: 当前行是 key，下一行是 value（Edge 格式）
+            if i < len(lines):
+                next_line = lines[i].strip()
+                if re.match(r'^[a-zA-Z][a-zA-Z0-9_-]*$', line) and \
+                   next_line and not next_line.startswith(":") and \
+                   ":" not in next_line:
+                    key = line
+                    value = next_line
+                    i += 1
+                else:
+                    continue
+            else:
+                continue
 
         key_lower = key.lower()
 
@@ -64,7 +84,6 @@ def parse_headers_from_paste(raw_text: str) -> dict:
             "sec-fetch-user", "upgrade-insecure-requests",
             "x-requested-with",
         ):
-            # 用原始 key 名保存（浏览器粘贴过来的就是标准格式）
             headers[key] = value
         elif key_lower in ("content-length", "host"):
             pass  # 自动生成，不保存
