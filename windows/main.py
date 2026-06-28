@@ -36,6 +36,9 @@ def _ensure_pip(force=False):
 
 # ─── 启动时自动安装缺失依赖 ───
 def _install_deps():
+    # --server 模式不需要 pywebview
+    if "--server" in sys.argv:
+        return True
     _MISSING = []
     for _mod in ("webview",):
         try:
