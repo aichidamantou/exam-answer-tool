@@ -46,6 +46,15 @@ def _install_deps():
         return True
     print(f"[安装] 缺失依赖: {_MISSING}")
     _ensure_pip()
+    # 先确保 setuptools 可用（pywebview 构建需要）
+    for _pre in ("setuptools", "wheel"):
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "--upgrade", _pre,
+                 "-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "-q"]
+            )
+        except:
+            pass
     ok = True
     for dep in _MISSING:
         try:
@@ -53,7 +62,7 @@ def _install_deps():
                 [sys.executable, "-m", "pip", "install", dep,
                  "-i", "https://pypi.tuna.tsinghua.edu.cn/simple", "-q"]
             )
-            __import__(_mod)
+            __import__(dep.replace("-", "_"))
             print(f"  ✅ {dep}")
         except Exception as e:
             print(f"  ❌ {dep} 安装失败: {e}")
