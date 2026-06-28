@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen, build_opener
 import http.cookiejar
 
 
-def fetch_page(pid: str, cookie: str) -> str:
+def fetch_page(pid: str, cookie: str, base_url: str = "https://sxvtc.cjnep.net/lms/web/exam/examshow?pid=") -> str:
     """请求 examshow 页面，返回 HTML"""
     cj = http.cookiejar.CookieJar()
     for item in cookie.split(";"):
@@ -22,7 +22,8 @@ def fetch_page(pid: str, cookie: str) -> str:
                 expires=None, discard=False, comment=None, comment_url=None,
                 rest={"HttpOnly": None}, rfc2109=False))
     op = build_opener(http.cookiejar.HTTPCookieProcessor(cj))
-    r = Request(f"https://sxvtc.cjnep.net/lms/web/exam/examshow?pid={pid}")
+    url = f"{base_url}{pid}"
+    r = Request(url)
     r.add_header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
     r.add_header("Accept-Language", "zh-CN,zh;q=0.9")
@@ -52,10 +53,10 @@ def parse_html(html: str) -> list:
     return results
 
 
-def check_cookie(pid: str, cookie: str) -> bool:
+def check_cookie(pid: str, cookie: str, base_url: str = "https://sxvtc.cjnep.net/lms/web/exam/examshow?pid=") -> bool:
     """验证 Cookie 是否有效"""
     try:
-        h = fetch_page(pid, cookie)
+        h = fetch_page(pid, cookie, base_url)
         return "eptimu_name" in h
     except:
         return False

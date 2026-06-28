@@ -3,7 +3,7 @@
 考试答题工具 - 原生窗口版
 HTML 渲染界面，原生窗口显示（不跳转浏览器）
 """
-import sys, os, json, threading, datetime, re, webbrowser
+import sys, os, json, threading, datetime, re
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,34 +15,25 @@ CONFIG_FILE = APP_DIR / "config.json"
 
 cookie_str = ""
 pid_val = ""
+getanserurl = "https://sxvtc.cjnep.net/lms/web/exam/examshow?pid="
 
 def load_config():
-    global cookie_str, pid_val
+    global cookie_str, pid_val, getanserurl
     try:
         if CONFIG_FILE.exists():
             d = json.load(open(CONFIG_FILE, encoding="utf-8"))
             cookie_str = d.get("cookie", "")
             pid_val = d.get("pid", "")
+            getanserurl = d.get("getanserurl", "https://sxvtc.cjnep.net/lms/web/exam/examshow?pid=")
     except: pass
 
 def save_config():
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump({"cookie": cookie_str, "pid": pid_val}, f, ensure_ascii=False)
+            json.dump({"cookie": cookie_str, "pid": pid_val, "getanserurl": getanserurl}, f, ensure_ascii=False, indent=2)
     except: pass
 
-log_cache = []
-def log_msg(msg):
-    ts = datetime.datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    log_cache.append(line)
-    try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except: pass
-    return line
-
-# ─── HTTP API（WebView 内部调用） ───
+# ─── HTTP API ───
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -50,14 +41,15 @@ api_server = None
 
 class ApiHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        global cookie_str, pid_val
+        global cookie_str, pid_val, getanserurl
         u = urlparse(self.path)
         if u.path == '/api/check':
             q = parse_qs(u.query)
             pid = q.get('pid', [''])[0]
             ck = q.get('cookie', [''])[0]
+            urlbase = q.get('url', [getanserurl])[0]
             try:
-                ok = check_cookie(pid, ck)
+                ok = check_cookie(pid, ck, urlbase)
                 self._text("Cookie 有效" if ok else "Cookie 无效")
             except Exception as e:
                 self._text(f"错误: {str(e)[:50]}")
@@ -65,22 +57,21 @@ class ApiHandler(BaseHTTPRequestHandler):
             q = parse_qs(u.query)
             pid = q.get('pid', [''])[0]
             ck = q.get('cookie', [''])[0]
+            urlbase = q.get('url', [getanserurl])[0]
             try:
-                h = fetch_page(pid, ck)
+                h = fetch_page(pid, ck, urlbase)
                 rs = parse_html(h)
                 found = sum(1 for r in rs if r["answer"])
                 txt = ""
                 for r in rs:
                     a = r["answer"] if r["answer"] else "?"
                     txt += f"第{r['num']:>2}题 [{r['type']}] {a}\n"
-                cookie_str = ck; pid_val = pid; save_config()
+                cookie_str = ck; pid_val = pid; getanserurl = urlbase; save_config()
                 self._json({"found": found, "total": len(rs), "text": txt})
             except Exception as e:
                 self._json({"error": str(e)[:60]})
-        elif u.path == '/api/log':
-            self._json({"logs": log_cache[-100:]})
         elif u.path == '/api/config':
-            self._json({"cookie": cookie_str, "pid": pid_val})
+            self._json({"cookie": cookie_str, "pid": pid_val, "getanserurl": getanserurl})
         else:
             self._text("ok")
     def _text(self, t):
@@ -165,14 +156,11 @@ function fetchAnswers(){let p=document.getElementById('pid').value.trim();let c=
 window.onload=function(){let p=document.getElementById('pid');let ck=document.getElementById('cookie');fetch(API+'/api/config').then(r=>r.json()).then(d=>{if(d.cookie)ck.value=d.cookie;if(d.pid)p.value=d.pid});log('程序启动')};
 </script></body></html>"""
 
-
 def main():
     load_config()
     port = start_api()
 
     html = HTML.replace("APIPORT", str(port))
-    html = html.replace('value=""', f'value="{pid_val}"')
-    html = html.replace('placeholder="F12', f'placeholder="F12')
 
     import webview
     webview.create_window(
@@ -183,7 +171,6 @@ def main():
         resizable=False,
     )
     webview.start(private_mode=False)
-
 
 if __name__ == "__main__":
     main()
