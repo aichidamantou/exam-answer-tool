@@ -390,6 +390,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._json(result)
             except Exception as e:
                 self._json({"success": False, "msg": f"随机逐题启动失败: {str(e)[:100]}"})
+        elif u.path == '/api/exit':
+            self._text("bye")
+            import threading
+            threading.Timer(0.3, lambda: os._exit(0)).start()
         else:
             self._text("ok")
     def _cors(self):
@@ -479,6 +483,9 @@ input[type=text]{padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-si
 <div class="right">
   <h3>日志栏</h3>
   <div class="log-area"><textarea id="log" readonly></textarea></div>
+  <div style="margin-top:6px;text-align:center">
+    <button class="btn" onclick="exitApp()" style="color:#C00000">关闭退出</button>
+  </div>
 </div>
 <script>
 let API='';
@@ -490,6 +497,7 @@ function checkPid(){let p=document.getElementById('pid').value.trim();if(!p||!/^
 function fetchAnswers(){let p=document.getElementById('pid').value.trim();if(!p||!/^\d+$/.test(p)){alert('输入 PID');return}log('提取答案: '+p);getStoredCookie().then(c=>{let ck=encodeURIComponent(c);fetch(API+'/api/fetch?pid='+p+'&cookie='+ck).then(r=>r.json()).then(d=>{if(d.error){log('错误: '+d.error);return};log('完成: '+d.found+'/'+d.total);if(d.template_pageid)log('📋 template_pageid='+d.template_pageid+' course_id='+d.course_id);document.getElementById('preview').value=d.text;document.getElementById('execBtn').disabled=false;document.getElementById('gradualBtn').disabled=false}).catch(e=>log('错误: '+e))})}
 function submitFast(){let btn=document.getElementById('execBtn');btn.disabled=true;btn.textContent='答题中...';log('🚀 快速提交...');fetch(API+'/api/submit',{method:'POST',body:JSON.stringify({}),headers:{'Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{if(d.success){log('✅ 交卷成功! PID='+d.new_pid);log('📊 提交 '+d.answered+' 题');if(d.result){log('  正确:'+d.result.correct+' 错误:'+d.result.wrong+' 未做:'+d.result.unanswered)}else{log('  共 '+d.total+' 题')}}else{log('❌ '+d.msg)}btn.disabled=false;btn.textContent='提交(快速)'}).catch(e=>{log('错误: '+e);btn.disabled=false;btn.textContent='提交(快速)'})}
 function randomFast(){let btn=document.getElementById('vbtn_fast');btn.disabled=true;btn.textContent='随机中...';log('🎲 随机(快速)...');fetch(API+'/api/random_exam',{method:'POST',body:JSON.stringify({}),headers:{'Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{if(d.success){log('✅ 随机完成! PID='+d.new_pid);log('📊 提交 '+d.answered+' 题');if(d.result){log('  正确:'+d.result.correct+' 错误:'+d.result.wrong+' 未做:'+d.result.unanswered)}else{log('  共 '+d.total+' 题')}}else{log('❌ '+d.msg)}btn.disabled=false;btn.textContent='随机(快速)'}).catch(e=>{log('错误: '+e);btn.disabled=false;btn.textContent='随机(快速)'})}
+function exitApp(){if(confirm('确认退出程序？')){fetch(API+'/api/exit',{method:'POST',body:'{}'}).then(()=>{}).catch(()=>{})}}
 function randomGradual(){let btn=document.getElementById('vbtn');if(g_job_id){log('🛑 取消随机...');g_job_id=null;if(g_poll_timer){clearInterval(g_poll_timer);g_poll_timer=null}btn.disabled=false;btn.textContent='随机(逐题)';return}
 btn.disabled=true;btn.textContent='启动中...';log('🎲 随机逐题(每题间隔10-20秒)...');fetch(API+'/api/random_gradual',{method:'POST',body:JSON.stringify({}),headers:{'Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{if(d.success){g_job_id=d.job_id;log('📋 随机任务启动, 共'+d.total+'题');btn.textContent='点击取消';g_poll_timer=setInterval(function(){fetch(API+'/api/job_status',{method:'POST',body:JSON.stringify({job_id:g_job_id}),headers:{'Content-Type':'application/json'}}).then(r=>r.json()).then(s=>{if(s.status=='answering'){log('⏳ 第'+s.current_num+'题 随机('+s.answer+'), '+s.completed+'/'+s.total);}else if(s.status=='done'){log('✅ 随机完成! '+s.msg);if(s.result){log('📊 正确:'+s.result.correct+' 错误:'+s.result.wrong+' 未做:'+s.result.unanswered)}clearInterval(g_poll_timer);g_poll_timer=null;g_job_id=null;btn.textContent='随机(逐题)';btn.disabled=false}else if(s.status=='error'){log('❌ '+s.msg);clearInterval(g_poll_timer);g_poll_timer=null;g_job_id=null;btn.disabled=false;btn.textContent='随机(逐题)'}})},15000)}else{log('❌ '+d.msg);btn.disabled=false;btn.textContent='随机(逐题)'}}).catch(e=>{log('错误: '+e);btn.disabled=false;btn.textContent='随机(逐题)'})}
 var g_job_id=null;var g_poll_timer=null;
@@ -536,10 +544,19 @@ def main():
         print(f"[回退] pywebview 不可用 ({e})，已在浏览器打开")
         import webbrowser
         webbrowser.open(f"http://127.0.0.1:{port}")
-        # 保持 HTTP 服务器运行
-        while True:
-            import time
-            time.sleep(3600)
+        import time
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if api_server:
+            api_server.shutdown()
+        print("程序已退出")
