@@ -3,4 +3,10 @@ config.json
 cookie.txt
 headers.txt
 exam_tool.log
+*.spec
+build/
+__pycache__/
+mac/考试答题工具
+mac/考试答题工具.app
+windows/考试答题工具.exe
 
