@@ -83,6 +83,16 @@ class ApiHandler(BaseHTTPRequestHandler):
             try:
                 result = check_pid(pid, ck, getanserurl,
                                     browser_headers=browser_headers if browser_headers else None)
+                # PID 检测通过后更新全局 pid 并保存 config
+                if result.get("ok", False):
+                    pid_val = pid
+                    try:
+                        with open(CONFIG_FILE, encoding="utf-8") as f:
+                            d = json.load(f)
+                        d["pid"] = pid
+                        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                            json.dump(d, f, ensure_ascii=False, indent=2)
+                    except: pass
                 self._json(result)
             except Exception as e:
                 self._json({"ok": False, "msg": str(e)[:50]})
