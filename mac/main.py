@@ -403,9 +403,12 @@ class ApiHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({"success": False, "msg": f"随机逐题启动失败: {str(e)[:100]}"})
         elif u.path == '/api/exit':
-            self._text("bye")
+            self._text("ok")
             import threading
-            threading.Timer(0.3, lambda: os._exit(0)).start()
+            threading.Timer(0.3, lambda: (
+                print("\n程序已退出，请关闭浏览器页面"),
+                os._exit(0)
+            )).start()
         else:
             self._text("ok")
     def _cors(self):
